@@ -266,8 +266,8 @@ AwesomePlayer::AwesomePlayer()
     mVideoFrameDeltaUs = 0;
 #ifdef QCOM_DIRECTTRACK
     mIsTunnelAudio = false;
+    mIsTunnelTearDown = false;
 #endif
-
     reset();
 
     mPlayerExtendedStats = (PlayerExtendedStats *)ExtendedStats::Create(
@@ -290,6 +290,7 @@ AwesomePlayer::~AwesomePlayer() {
         }
     }
     mIsTunnelAudio = false;
+    mIsTunnelTearDown = false;
 #endif
     mClient.disconnect();
 }
@@ -1898,12 +1899,12 @@ status_t AwesomePlayer::initAudioDecoder() {
             mime, (TunnelPlayer::mTunnelObjectsAlive), mTunnelAliveAP);
 
     bool sys_prop_enabled = !strcmp("true",tunnelDecode) || atoi(tunnelDecode);
-    ALOGD("maxPossible tunnels = %d", TunnelPlayer::getTunnelObjectsAliveMax());
+    ALOGD("maxPossible tunnels = %d mIsTunnelTearDown = %d ", TunnelPlayer::getTunnelObjectsAliveMax(),mIsTunnelTearDown);
     //widevine will fallback to software decoder
     if (sys_prop_enabled && (TunnelPlayer::mTunnelObjectsAlive < TunnelPlayer::getTunnelObjectsAliveMax()) &&
        (mTunnelAliveAP < TunnelPlayer::getTunnelObjectsAliveMax()) && (isADTS == 0) &&
         mAudioSink->realtime() &&
-        inSupportedTunnelFormats(mime)) {
+        inSupportedTunnelFormats(mime) && !mIsTunnelTearDown) {
 
         if (mVideoSource != NULL) {
            char tunnelAVDecode[PROPERTY_VALUE_MAX];
@@ -3156,6 +3157,9 @@ void AwesomePlayer::finishAsyncPrepare_l() {
             }
         }
         mAudioTearDown = false;
+#ifdef QCOM_DIRECTTRACK
+        mIsTunnelTearDown = false;
+#endif
     }
 }
 
@@ -3645,6 +3649,13 @@ void AwesomePlayer::onAudioTearDownEvent() {
     sp<IMediaHTTPService> savedHTTPService = mHTTPService;
 
     bool wasLooping = mFlags & LOOPING;
+#ifdef QCOM_DIRECTTRACK
+    if (mIsTunnelAudio) {
+        if(mTunnelAliveAP > 0) {
+           mIsTunnelTearDown = true;
+        }
+    }
+#endif
     // Reset and recreate
     reset_l();
 
