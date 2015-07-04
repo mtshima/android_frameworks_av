@@ -341,6 +341,11 @@ status_t NuPlayer::Renderer::openAudioSink(
     return err;
 }
 
+void NuPlayer::Renderer::startAudioSink() {
+    sp<AMessage> msg = new AMessage(kWhatStartAudioSink, id());
+    msg->post();
+}
+
 void NuPlayer::Renderer::closeAudioSink() {
     sp<AMessage> msg = new AMessage(kWhatCloseAudioSink, id());
 
@@ -389,6 +394,12 @@ void NuPlayer::Renderer::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AMessage> response = new AMessage;
             response->postReply(replyID);
+            break;
+        }
+
+        case kWhatStartAudioSink:
+        {
+            mAudioSink->start();
             break;
         }
 
@@ -1191,6 +1202,11 @@ void NuPlayer::Renderer::onFlush(const sp<AMessage> &msg) {
             mAudioSink->pause();
             mAudioSink->flush();
             mAudioSink->start();
+        } else {
+            if (mPaused) {
+                mAudioSink->flush();
+                mNumFramesWritten = 0;
+            }
         }
     } else {
         flushQueue(&mVideoQueue);

@@ -1563,6 +1563,7 @@ void NuPlayer::GenericSource::readBuffer(
     if (seekTimeUs >= 0) {
         options.setSeekTo(seekTimeUs, MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC);
         seeking = true;
+        track->mPackets->clear();
     }
 
     if (mIsWidevine) {
@@ -1602,6 +1603,10 @@ void NuPlayer::GenericSource::readBuffer(
             formatChange = false;
             seeking = false;
             ++numBuffers;
+
+            if (trackType == MEDIA_TRACK_TYPE_VIDEO) {
+                actualTimeUs = NULL;
+            }
         } else if (err == WOULD_BLOCK) {
             break;
         } else if (err == INFO_FORMAT_CHANGED) {
