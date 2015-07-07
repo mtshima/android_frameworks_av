@@ -6369,14 +6369,14 @@ void ACodec::ExecutingToIdleState::changeStateIfWeOwnAllBuffers() {
             }
 #endif
 
-            if ((mCodec->mFlags & kFlagPushBlankBuffersToNativeWindowOnShutdown)
+        if ((mCodec->mFlags & kFlagPushBlankBuffersToNativeWindowOnShutdown)
                 && mCodec->mNativeWindow != NULL) {
-                // We push enough 1x1 blank buffers to ensure that one of
-                // them has made it to the display.  This allows the OMX
-                // component teardown to zero out any protected buffers
-                // without the risk of scanning out one of those buffers.
-                mCodec->pushBlankBuffersToNativeWindow();
-            }
+            // We push enough 1x1 blank buffers to ensure that one of
+            // them has made it to the display.  This allows the OMX
+            // component teardown to zero out any protected buffers
+            // without the risk of scanning out one of those buffers.
+            mCodec->pushBlankBuffersToNativeWindow();
+        }
 #ifdef QCOM_BSP_LEGACY
        }
 #endif
