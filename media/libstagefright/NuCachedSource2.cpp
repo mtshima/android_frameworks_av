@@ -196,7 +196,6 @@ NuCachedSource2::NuCachedSource2(
       mNumRetriesLeft(kMaxNumRetries),
       mHighwaterThresholdBytes(kDefaultHighWaterThreshold),
       mLowwaterThresholdBytes(kDefaultLowWaterThreshold),
-      mGrayAreaBytes(kDefaultGrayAreaBytes),
       mKeepAliveIntervalUs(kDefaultKeepAliveIntervalUs),
       mDisconnectAtHighwatermark(disconnectAtHighwatermark),
       mSuspended(false) {
@@ -479,6 +478,8 @@ void NuCachedSource2::onRead(const sp<AMessage> &msg) {
 
 void NuCachedSource2::restartPrefetcherIfNecessary_l(
         bool ignoreLowWaterThreshold, bool force) {
+    static const size_t kGrayArea = 1024 * 1024;
+
     if (mFetching || (mFinalStatus != OK && mNumRetriesLeft == 0)) {
         return;
     }
@@ -491,14 +492,12 @@ void NuCachedSource2::restartPrefetcherIfNecessary_l(
 
     size_t maxBytes = mLastAccessPos - mCacheOffset;
 
-    if (maxBytes > mGrayAreaBytes) {
-        maxBytes -= mGrayAreaBytes;
-    } else {
-        maxBytes = 0;
-    }
+    if (!force) {
+        if (maxBytes < kGrayArea) {
+            return;
+        }
 
-    if (!force && !maxBytes) {
-        return;
+        maxBytes -= kGrayArea;
     }
 
     size_t actualBytes = mCache->releaseFromStart(maxBytes);
@@ -599,8 +598,7 @@ ssize_t NuCachedSource2::readInternal(off64_t offset, void *data, size_t size) {
     }
 
     if (offset < mCacheOffset
-            || (offset >= (off64_t)(mCacheOffset + mCache->totalSize())
-                && offset >= (off64_t)(mCacheOffset + mLowwaterThresholdBytes))) {
+            || offset >= (off64_t)(mCacheOffset + mCache->totalSize())) {
         static const off64_t kPadding = 256 * 1024;
 
         // In the presence of multiple decoded streams, once of them will
@@ -733,28 +731,10 @@ void NuCachedSource2::updateCacheParamsFromString(const char *s) {
         mKeepAliveIntervalUs = kDefaultKeepAliveIntervalUs;
     }
 
-    /* If we can preserve the low-water bytes before the new offset
-     * then do so, otherwise keep half of the data between the low
-     * and high water marks around and refill the second half.
-     * If that is less than the AOSP 1MB threshold, just use that
-     * 1MB threshold instead.
-     */
-
-    size_t gap = mHighwaterThresholdBytes - mLowwaterThresholdBytes;
-    if (gap / 2 > mLowwaterThresholdBytes) {
-        mGrayAreaBytes = mLowwaterThresholdBytes;
-    } else if (gap / 2 > 1024*1024) {
-        mGrayAreaBytes = gap / 2;
-    } else {
-        mGrayAreaBytes = 1024*!024;
-    }
-
-    ALOGV("lowwater = %zu bytes, highwater = %zu bytes, keepalive = %" PRId64 " us"
-          ", gray = %zu bytes",
+    ALOGV("lowwater = %zu bytes, highwater = %zu bytes, keepalive = %" PRId64 " us",
          mLowwaterThresholdBytes,
          mHighwaterThresholdBytes,
-         mKeepAliveIntervalUs,
-         mGrayAreaBytes);
+         mKeepAliveIntervalUs);
 }
 
 // static
